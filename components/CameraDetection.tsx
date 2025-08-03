@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import * as ort from 'onnxruntime-web'
 
 interface Detection {
   x: number
@@ -26,7 +25,7 @@ export default function CameraDetection() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animationRef = useRef<number | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const sessionRef = useRef<ort.InferenceSession | null>(null)
+  const sessionRef = useRef<any>(null)
   
   const [isLoading, setIsLoading] = useState(true)
   const [isModelLoaded, setIsModelLoaded] = useState(false)
@@ -42,10 +41,51 @@ export default function CameraDetection() {
 
   // ONNX Runtime Web WASM yollarını ayarla
   useEffect(() => {
-    // WASM dosyalarının yolunu public/models klasörüne ayarla
-    ort.env.wasm.wasmPaths = '/models/'
+    const initializeONNX = async () => {
+      try {
+        // CDN'den yüklenen ONNX Runtime'ı bekle
+        let ort = (window as any).ort
+        
+        // Eğer henüz yüklenmemişse bekle
+        if (!ort) {
+          console.log('ONNX Runtime yükleniyor...')
+          await new Promise(resolve => {
+            const checkOrt = () => {
+              if ((window as any).ort) {
+                resolve(true)
+              } else {
+                setTimeout(checkOrt, 100)
+              }
+            }
+            checkOrt()
+          })
+          ort = (window as any).ort
+        }
+        
+        // ONNX Runtime'ın yüklenip yüklenmediğini kontrol et
+        if (typeof ort === 'undefined') {
+          console.error('ONNX Runtime yüklenemedi!')
+          setError('ONNX Runtime kütüphanesi yüklenemedi.')
+          return
+        }
+        
+        // WASM dosyalarının yolunu public/models klasörüne ayarla
+        ort.env.wasm.wasmPaths = '/models/'
+        
+        console.log('ONNX Runtime Web WASM yolları ayarlandı:', ort.env.wasm.wasmPaths)
+        console.log('ONNX Runtime mevcut:', !!ort)
+        console.log('InferenceSession mevcut:', !!ort.InferenceSession)
+        
+        // Global ort değişkenini ayarla
+        ;(window as any).ort = ort
+        
+      } catch (err) {
+        console.error('ONNX Runtime yükleme hatası:', err)
+        setError('ONNX Runtime kütüphanesi yüklenemedi.')
+      }
+    }
     
-    console.log('ONNX Runtime Web WASM yolları ayarlandı:', ort.env.wasm.wasmPaths)
+    initializeONNX()
   }, [])
 
   // Fallback detection (basit tespit)
@@ -97,40 +137,58 @@ export default function CameraDetection() {
       
       console.log('ONNX model yükleniyor...')
       
-      // Anında progress başlat
-      setLoadingProgress(30)
+      // ONNX Runtime'ın yüklenip yüklenmediğini kontrol et
+      if (typeof (window as any).ort === 'undefined') {
+        throw new Error('ONNX Runtime yüklenemedi')
+      }
       
-      // Model dosyasını yükle - optimize edilmiş
+      console.log('ONNX Runtime versiyonu:', (window as any).ort.env.versions)
+      console.log('WASM yolları:', (window as any).ort.env.wasm.wasmPaths)
+      
+      // Anında progress başlat
+      setLoadingProgress(10)
+      
+      // Önce basit bir test yap
+      console.log('ONNX Runtime test ediliyor...')
+      try {
+        // Boş bir tensor oluşturarak test et
+        const testTensor = new (window as any).ort.Tensor('float32', new Float32Array([1, 2, 3]), [3])
+        console.log('Test tensor oluşturuldu:', testTensor)
+      } catch (testErr) {
+        console.error('ONNX Runtime test hatası:', testErr)
+        throw new Error('ONNX Runtime çalışmıyor: ' + (testErr instanceof Error ? testErr.message : String(testErr)))
+      }
+      
+      setLoadingProgress(20)
+      
+      // Model dosyasını yükle
       const modelPath = '/models/best.onnx'
-      const response = await fetch(modelPath, {
-        cache: 'force-cache',
-        priority: 'high'
-      })
+      console.log('Model dosyası yükleniyor:', modelPath)
+      
+      const response = await fetch(modelPath)
+      
+      console.log('Fetch response status:', response.status)
       
       if (!response.ok) {
-        throw new Error(`Model dosyası yüklenemedi: ${response.status}`)
+        throw new Error(`Model dosyası yüklenemedi: ${response.status} ${response.statusText}`)
       }
+      
+      setLoadingProgress(40)
+      
+      const modelBuffer = await response.arrayBuffer()
+      console.log('Model buffer boyutu:', modelBuffer.byteLength, 'bytes')
       
       setLoadingProgress(60)
       
-      const modelBuffer = await response.arrayBuffer()
-      
-      setLoadingProgress(80)
-      
-      // ONNX session oluştur - optimize edilmiş ayarlar
-      const session = await ort.InferenceSession.create(modelBuffer, {
-        executionProviders: ['wasm'],
-        graphOptimizationLevel: 'all',
-        enableCpuMemArena: true,
-        enableMemPattern: true,
-        executionMode: 'parallel',
-        extra: {
-          session: {
-            use_ort_model_bytes_directly: true,
-            use_ort_model_bytes_for_initializers: true
-          }
-        }
+      // ONNX session oluştur - basit ayarlar
+      console.log('ONNX session oluşturuluyor...')
+      const session = await (window as any).ort.InferenceSession.create(modelBuffer, {
+        executionProviders: ['wasm']
       })
+      
+      console.log('ONNX session başarıyla oluşturuldu:', session)
+      console.log('Session input names:', session.inputNames)
+      console.log('Session output names:', session.outputNames)
       
       setLoadingProgress(100)
       
@@ -141,8 +199,28 @@ export default function CameraDetection() {
       console.log('ONNX model başarıyla yüklendi!')
       
     } catch (err) {
-      console.error('Model yükleme hatası:', err)
-      setError('AI modeli yüklenemedi. Fallback modu kullanılıyor.')
+      console.error('Model yükleme hatası detayları:', err)
+      console.error('Hata stack trace:', err instanceof Error ? err.stack : 'Stack trace yok')
+      
+      // Daha detaylı hata mesajı
+      let errorMessage = 'AI modeli yüklenemedi. '
+      if (err instanceof Error) {
+        if (err.message.includes('fetch')) {
+          errorMessage += 'Model dosyası bulunamadı veya yüklenemedi.'
+        } else if (err.message.includes('wasm')) {
+          errorMessage += 'WASM dosyaları yüklenemedi.'
+        } else if (err.message.includes('session')) {
+          errorMessage += 'ONNX session oluşturulamadı.'
+        } else if (err.message.includes('ONNX Runtime')) {
+          errorMessage += 'ONNX Runtime kütüphanesi sorunu.'
+        } else {
+          errorMessage += err.message
+        }
+      } else {
+        errorMessage += 'Bilinmeyen hata oluştu.'
+      }
+      
+      setError(errorMessage)
       setIsLoading(false)
       setUseFallbackMode(true)
       setIsModelLoaded(true)
@@ -274,14 +352,14 @@ export default function CameraDetection() {
       const input = preprocessImage(imageData)
       
       // Model input formatını hazırla
-      const inputTensor = new ort.Tensor('float32', input, [1, 3, 640, 640])
+      const inputTensor = new (window as any).ort.Tensor('float32', input, [1, 3, 640, 640])
       
       // Inference çalıştır
       const feeds = { images: inputTensor }
       const results = await sessionRef.current.run(feeds)
       
       // Sonuçları al
-      const output = results[Object.keys(results)[0]] as ort.Tensor
+      const output = results[Object.keys(results)[0]] as any
       const outputData = output.data as Float32Array
       
       // YOLOv8 çıktısını parse et

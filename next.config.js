@@ -9,13 +9,26 @@ const nextConfig = {
       crypto: false,
     }
 
-    // ONNX Runtime Web için WASM dosyaları - optimize edilmiş
+    // ONNX Runtime Web için WASM dosyaları
     config.module.rules.push({
       test: /\.wasm$/,
       type: 'asset/resource',
       generator: {
         filename: 'static/wasm/[name][ext]'
       }
+    })
+
+    // ONNX Runtime dosyalarını tamamen ignore et
+    config.module.rules.push({
+      test: /ort\.(node|web)\.min\.(js|mjs)$/,
+      use: 'null-loader'
+    })
+
+    // ONNX Runtime'ı externals olarak tanımla
+    config.externals = config.externals || []
+    config.externals.push({
+      'onnxruntime-web': 'ort',
+      'onnxruntime-node': 'ort'
     })
 
     // Cross-Origin headers for ONNX Runtime Web
@@ -25,7 +38,7 @@ const nextConfig = {
 
     return config
   },
-  // ONNX Runtime Web için optimize edilmiş headers
+  // ONNX Runtime Web için headers
   async headers() {
     return [
       {
@@ -53,7 +66,6 @@ const nextConfig = {
   generateEtags: false,
   experimental: {
     optimizeCss: true,
-    optimizePackageImports: ['onnxruntime-web'],
   },
 }
 

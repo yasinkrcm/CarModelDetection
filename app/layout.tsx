@@ -17,6 +17,9 @@ export default function RootLayout({
   return (
     <html lang="tr">
       <head>
+        {/* ONNX Runtime CDN */}
+        <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.min.js"></script>
+        
         {/* Security headers */}
         <meta httpEquiv="Cross-Origin-Embedder-Policy" content="require-corp" />
         <meta httpEquiv="Cross-Origin-Opener-Policy" content="same-origin" />
