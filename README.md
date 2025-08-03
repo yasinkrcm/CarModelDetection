@@ -39,7 +39,7 @@ Alpha Romeo, Audi, Bentley, Mercedes, BMW, Cadillac, Dodge, Ferrari, Ford, Ford 
 ### 1. Projeyi Klonlayın
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/yasinkrcm/CarModelDetection
 cd CarModelDetection
 ```
 
@@ -132,21 +132,6 @@ python train_model.py
 - **Version**: 3
 - **API Key**: Kendi API anahtarınızı kullanın
 
-## 🌐 Deployment
-
-### Vercel (Önerilen)
-
-```bash
-npm install -g vercel
-vercel login
-vercel --prod
-```
-
-### Diğer Platformlar
-- **Netlify**: `npm run build && netlify deploy`
-- **AWS S3 + CloudFront**: Statik hosting
-- **GitHub Pages**: `npm run build && gh-pages -d out`
-
 ## 🔒 Gizlilik
 
 - Tüm AI işlemleri tarayıcıda gerçekleşir
@@ -191,9 +176,6 @@ vercel --prod
 4. Push yapın (`git push origin feature/amazing-feature`)
 5. Pull Request açın
 
-## 📄 Lisans
-
-Bu proje MIT lisansı altında lisanslanmıştır. Detaylar için `LICENSE` dosyasına bakın.
 
 ## 📞 İletişim
 
