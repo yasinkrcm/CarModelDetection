@@ -7,8 +7,8 @@
 ![Next.js](https://img.shields.io/badge/Next.js-14-black?style=for-the-badge&logo=next.js)
 ![YOLOv8](https://img.shields.io/badge/YOLOv8-Object%20Detection-red?style=for-the-badge&logo=pytorch)
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-🚀%20Try%20Now-orange?style=for-the-badge&logo=vercel)](https://car-brand-detection.vercel.app)
-[![GitHub Stars](https://img.shields.io/github/stars/yourusername/car-brand-detection?style=for-the-badge&logo=github)](https://github.com/yourusername/car-brand-detection)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-🚀%20Try%20Now-orange?style=for-the-badge&logo=vercel)](https://car-model-detection.vercel.app/)
+[![GitHub Stars](https://img.shields.io/github/stars/yasinkrcm/CarModelDetection?style=for-the-badge&logo=github)](https://github.com/yasinkrcm/CarModelDetecion)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
 *🎯 **Yapay Zeka ile Gerçek Zamanlı Araç Markası Tespiti** - Kamera ile anında araç markası tanıma!*
