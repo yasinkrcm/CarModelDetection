@@ -38,7 +38,15 @@ next-env.d.ts
 *.onnx
 runs/
 datasets/
+
 *.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tiff
+*.ico
+
 # Python
 __pycache__/
 *.py[cod]
