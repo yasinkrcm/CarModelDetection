@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useRef, useState } from 'react';
-import * as ort from 'onnxruntime-web';
 import Link from 'next/link'
 
 // Class isimleri (data.yaml'dan)
@@ -82,13 +81,33 @@ export default function PostureCam() {
       if (!cameraOn) return;
       setError("");
       try {
+        console.log('Starting model loading process...');
+        
+        // Dynamically import onnxruntime-web with error handling
+        let ort;
+        try {
+          ort = await import('onnxruntime-web');
+          console.log('ONNX Runtime imported successfully');
+        } catch (importError) {
+          console.error('Failed to import ONNX Runtime:', importError);
+          throw new Error('ONNX Runtime yüklenemedi');
+        }
+        
         // WASM dosyalarının yolunu ayarla
-        ort.env.wasm.wasmPaths = '/models/';
+        if (ort.env && ort.env.wasm) {
+          ort.env.wasm.wasmPaths = '/models/';
+          console.log('WASM paths configured');
+        }
+        
+        console.log('Loading ONNX model...');
         // ONNX modelini yükle (onnxruntime-web) - optimize edilmiş modeli kullan
-        const session = await ort.InferenceSession.create('/models/best_optimized.onnx');
+        const session = await ort.InferenceSession.create('/models/best.onnx');
+        console.log('Model loaded successfully');
+        
         sessionRef.current = session;
         // Modelin input adını al
         inputNameRef.current = session.inputNames[0];
+        console.log('Model input name:', inputNameRef.current);
         setModelLoaded(true);
 
         // Kamera aç
@@ -116,6 +135,11 @@ export default function PostureCam() {
           };
         }
       } catch (err) {
+        console.error('Model loading error details:', {
+          message: err.message,
+          stack: err.stack,
+          name: err.name
+        });
         setError('Kamera veya model yüklenemedi: ' + err.message);
       }
     }
@@ -150,6 +174,9 @@ export default function PostureCam() {
         
         if (runDetection.aiFrameCount % 5 === 0) {
           try {
+            // Dynamically import onnxruntime-web for inference
+            const ort = await import('onnxruntime-web');
+            
             // 1. Frame'i 640x640'a resize et
             const offscreen = document.createElement('canvas');
             offscreen.width = 640;
