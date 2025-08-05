@@ -2,6 +2,13 @@
 const nextConfig = {
   // Basic webpack configuration
   webpack: (config, { isServer, dev }) => {
+    // Handle .mjs files from onnxruntime-web
+    config.module.rules.push({
+      test: /\.mjs$/,
+      include: /node_modules/,
+      type: "javascript/auto",
+    });
+    
     // Node.js modülleri için fallback
     config.resolve.fallback = {
       ...config.resolve.fallback,
