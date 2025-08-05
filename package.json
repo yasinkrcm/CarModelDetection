@@ -12,6 +12,7 @@
     "@tensorflow-models/coco-ssd": "^2.2.3",
     "@tensorflow/tfjs": "^4.22.0",
     "@tensorflow/tfjs-backend-webgl": "^4.22.0",
+    "onnxruntime" :"1.7.0",
     "next": "14.0.3",
     "onnxruntime-web": "^1.22.0",
     "react": "^18",

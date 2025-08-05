@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import * as ort from 'onnxruntime-web';
 
 const CAR_BRANDS = [
   'alpha-romeo',
@@ -98,27 +99,23 @@ let globalInputName = null
 let modelLoadPromise = null
 
 // Optimized ONNX Runtime configuration
-const initializeOnnxRuntime = () => {
-  // Wait for CDN ONNX Runtime to load
-  if (!window.ort) {
-    throw new Error('ONNX Runtime CDN not loaded yet')
+const initializeOnnxRuntime = async () => {
+  try {
+    // Use imported ort object
+    // This path is configured in next.config.js to serve wasm files
+    ort.env.wasm.wasmPaths = '/_next/static/wasm/';
+    ort.env.wasm.numThreads = 1; // Keep single thread for faster startup
+    ort.env.wasm.simd = true;
+    ort.env.wasm.proxy = false;
+    ort.env.logLevel = 'error';
+    
+    console.log('ONNX Runtime initialized with local WASM files (optimized)');
+    return ort;
+  } catch (error) {
+    console.error('Error initializing ONNX Runtime:', error);
+    throw error;
   }
-  
-  const ort = window.ort
-  
-  // Use CDN WASM files (much smaller than local threaded versions)
-  ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/'
-  ort.env.wasm.simd = true
-  ort.env.wasm.numThreads = 1 // Keep single thread for faster startup
-  
-  // Memory optimizations
-  ort.env.wasm.proxy = false // Disable proxy for better performance
-  ort.env.logLevel = 'error' // Only errors, reduce logging overhead
-  
-  console.log('ONNX Runtime initialized with CDN WASM files (optimized)')
-  
-  return ort
-}
+};
 
 export default function CameraDetection() {
   const videoRef = useRef(null)
@@ -134,7 +131,7 @@ export default function CameraDetection() {
   const [currentCamera, setCurrentCamera] = useState('user')
   const [deviceList, setDeviceList] = useState([])
   const [selectedDevice, setSelectedDevice] = useState('')
-  
+
   // Canvas cache for better performance
   const canvasCache = useRef({
     offscreen: null,
@@ -181,7 +178,7 @@ export default function CameraDetection() {
       
       try {
         // Initialize ONNX Runtime with optimized settings
-        const ort = initializeOnnxRuntime()
+        const ort = await initializeOnnxRuntime()
         
         // Use cached session if available
         if (globalSession && globalInputName) {
@@ -203,7 +200,7 @@ export default function CameraDetection() {
         await startCamera()
         
         if (isMounted) {
-          runDetection(ort)
+          runDetection()
         }
       } catch (err) {
         console.error('Model yükleme hatası:', err)
@@ -296,14 +293,14 @@ export default function CameraDetection() {
     let lastTime = performance.now()
     let frameCount = 0
     
-    async function runDetection(ort) {
+    async function runDetection() {
       if (!globalSession || !videoRef.current || !canvasRef.current) return
       
       // FPS throttling - daha hızlı tespit için azalttık
       if (!runDetection.lastInference) runDetection.lastInference = 0
       const now = performance.now()
       if (now - runDetection.lastInference < 100) { // 30 FPS'ten 10 FPS'e düşürdük (daha az CPU)
-        animationId = requestAnimationFrame(() => runDetection(ort))
+        animationId = requestAnimationFrame(() => runDetection())
         return
       }
       runDetection.lastInference = now
@@ -430,7 +427,7 @@ export default function CameraDetection() {
       }
       
       if (isMounted) {
-        animationId = requestAnimationFrame(() => runDetection(ort))
+        animationId = requestAnimationFrame(() => runDetection())
       }
     }
 
@@ -784,4 +781,4 @@ export default function CameraDetection() {
       )}
     </div>
   )
-} 
+}
