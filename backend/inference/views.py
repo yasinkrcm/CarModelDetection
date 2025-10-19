@@ -22,17 +22,30 @@ _device = None
 def _resolve_weights_path() -> str:
     """Resolve the most likely best.pt path within repo."""
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-    # 1) public/best.pt (as per user's file placement)
-    public_best = os.path.join(base_dir, 'public', 'best.pt')
+    # 1) public/models/best.pt (correct path)
+    public_best = os.path.join(base_dir, 'public', 'models', 'best.pt')
     if os.path.exists(public_best):
+        print(f"Found model at: {public_best}")
         return public_best
-    # 2) scripts/runs/.../best.pt (training output)
-    alt_best = os.path.join(base_dir, 'scripts', 'runs', 'detect', 'car_brand_detection2', 'weights', 'best.pt')
-    if os.path.exists(alt_best):
-        return alt_best
-    # 3) backend dir (in case user puts it here)
+    # 2) public/best.pt (alternative path)
+    alt_public = os.path.join(base_dir, 'public', 'best.pt')
+    if os.path.exists(alt_public):
+        print(f"Found model at: {alt_public}")
+        return alt_public
+    # 3) scripts/runs/.../best.pt (training output)
+    scripts_best = os.path.join(base_dir, 'scripts', 'runs', 'detect', 'car_brand_detection2', 'weights', 'best.pt')
+    if os.path.exists(scripts_best):
+        print(f"Found model at: {scripts_best}")
+        return scripts_best
+    # 4) backend dir (in case user puts it here)
     backend_best = os.path.join(base_dir, 'backend', 'best.pt')
-    return backend_best
+    if os.path.exists(backend_best):
+        print(f"Found model at: {backend_best}")
+        return backend_best
+    
+    # If none found, return the most likely path and let YOLO handle the error
+    print(f"Model not found, trying: {public_best}")
+    return public_best
 
 
 def _get_model():
@@ -45,15 +58,24 @@ def _get_model():
         from ultralytics import YOLO
         weights_path = _resolve_weights_path()
         _device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        # Load YOLO once; ultralytics internally handles device, but we also move underlying torch model
+        print(f"Loading YOLO model from: {weights_path}")
+        print(f"Using device: {_device}")
+        
+        # Load YOLO model
         model = YOLO(weights_path)
+        
+        # Move model to device
         try:
-            model.model.to(_device)  # move to device if available
-        except Exception:
-            pass
+            model.model.to(_device)
+            print(f"Model moved to {_device}")
+        except Exception as e:
+            print(f"Could not move model to device: {e}")
+        
         _model = model
+        print("Model loaded successfully!")
         return _model
     except Exception as e:
+        print(f"Error loading model: {e}")
         _model_load_error = e
         raise
 
@@ -63,7 +85,10 @@ def _run_inference(image_bytes: bytes, imgsz: int = 512, conf: float = 0.25) -> 
     # Convert raw bytes to numpy RGB image for Ultralytics
     pil_img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
     np_img = np.array(pil_img)
-    results = model.predict(source=np_img, imgsz=imgsz, conf=conf)
+    
+    print(f"Running inference on image shape: {np_img.shape}")
+    results = model.predict(source=np_img, imgsz=imgsz, conf=conf, device=_device)
+    
     detections: List[Dict[str, Any]] = []
     for r in results:
         if not hasattr(r, 'boxes') or r.boxes is None:
@@ -83,6 +108,8 @@ def _run_inference(image_bytes: bytes, imgsz: int = 512, conf: float = 0.25) -> 
                 'classId': cls_idx,
                 'className': name,
             })
+    
+    print(f"Found {len(detections)} detections")
     return detections
 
 
@@ -155,4 +182,5 @@ def predict(request):
         detections = _run_inference(image_bytes)
         return JsonResponse({'detections': detections})
     except Exception as e:
+        print(f"Inference error: {e}")
         return JsonResponse({'error': 'inference_failed', 'detail': str(e)}, status=500)

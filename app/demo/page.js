@@ -214,27 +214,27 @@ export default function PostureCam() {
 
                 const currentTime2 = Date.now();
                 detectionHistoryRef.current.push({ detections: finalDetections, timestamp: currentTime2 });
-                detectionHistoryRef.current = detectionHistoryRef.current.filter(
+              detectionHistoryRef.current = detectionHistoryRef.current.filter(
                   entry => currentTime2 - entry.timestamp < 2000
-                );
-
-                const stableDetected = [];
-                for (const detection of finalDetections) {
-                  const recentCount = detectionHistoryRef.current
-                    .slice(-3)
-                    .filter(entry => 
-                      entry.detections.some(d => d.classLabel === detection.classLabel)
-                    ).length;
+              );
+              
+              const stableDetected = [];
+              for (const detection of finalDetections) {
+                const recentCount = detectionHistoryRef.current
+                  .slice(-3)
+                  .filter(entry => 
+                    entry.detections.some(d => d.classLabel === detection.classLabel)
+                  ).length;
                   if (recentCount >= 1) {
-                    stableDetected.push(detection);
-                  }
+                  stableDetected.push(detection);
                 }
-
-                setDetections(prev => {
-                  const prevStr = JSON.stringify(prev);
-                  const currStr = JSON.stringify(stableDetected);
-                  return prevStr !== currStr ? stableDetected : prev;
-                });
+              }
+              
+              setDetections(prev => {
+                const prevStr = JSON.stringify(prev);
+                const currStr = JSON.stringify(stableDetected);
+                return prevStr !== currStr ? stableDetected : prev;
+              });
               } catch (e) {
                 // swallow network/timeout errors per frame
               } finally {
@@ -450,7 +450,7 @@ export default function PostureCam() {
                 🎯 Tespit Edilen Araç Markaları
               </h3>
               <div className="grid gap-3">
-                {displayedDetections.map((det, i) => (
+              {displayedDetections.map((det, i) => (
                   <div 
                     key={i} 
                     className="detection-card bg-white/10 backdrop-blur-lg rounded-xl p-4 border border-white/20 shadow-lg hover:bg-white/15 transition-all duration-300"
@@ -486,8 +486,8 @@ export default function PostureCam() {
                         }}
                       ></div>
                     </div>
-                  </div>
-                ))}
+                </div>
+              ))}
               </div>
               
               {/* İstatistikler */}
@@ -543,4 +543,4 @@ export default function PostureCam() {
       )}
     </div>
   );
-}
+} 
