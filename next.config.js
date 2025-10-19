@@ -2,13 +2,6 @@
 const nextConfig = {
   // Basic webpack configuration
   webpack: (config, { isServer, dev }) => {
-    // Handle .mjs files from onnxruntime-web
-    config.module.rules.push({
-      test: /\.mjs$/,
-      include: /node_modules/,
-      type: "javascript/auto",
-    });
-    
     // Node.js modülleri için fallback
     config.resolve.fallback = {
       ...config.resolve.fallback,
@@ -105,6 +98,15 @@ const nextConfig = {
   poweredByHeader: false,
   generateEtags: true,
   
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://127.0.0.1:8000/api/:path*',
+      },
+    ]
+  },
+  
   // Asset optimization
   images: {
     unoptimized: true, // ONNX için gerekli
@@ -125,4 +127,4 @@ const nextConfig = {
   }),
 }
 
-module.exports = nextConfig 
+module.exports = nextConfig

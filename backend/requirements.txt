@@ -1,0 +1,9 @@
+Django==5.0.6
+whitenoise==6.7.0
+django-cors-headers==4.4.0
+Pillow==10.4.0
+ultralytics==8.3.34
+djangorestframework==3.15.2
+# Install torch from official wheels; version pins below are broad to ease install
+torch>=2.2.0,<3
+torchvision>=0.17.0,<1
