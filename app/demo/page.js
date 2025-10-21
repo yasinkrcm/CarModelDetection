@@ -161,7 +161,12 @@ export default function PostureCam() {
               try {
                 const form = new FormData();
                 form.append('image', blob, 'frame.jpg');
-                const response = await fetch('/api/predict', {
+                // Add query parameters for runtime tuning
+                const params = new URLSearchParams();
+                params.append('conf', '0.4'); // Higher confidence to reduce false positives
+                params.append('imgsz', '640'); // Consistent image size
+                
+                const response = await fetch(`/api/predict?${params.toString()}`, {
                   method: 'POST',
                   body: form,
                   signal: controller.signal,

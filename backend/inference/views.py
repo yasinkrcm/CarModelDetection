@@ -17,6 +17,15 @@ from rest_framework.parsers import MultiPartParser, JSONParser
 _model = None
 _model_load_error = None
 _device = None
+_warmed_up = False
+
+# Tunable inference knobs (can be overridden via env)
+_DEFAULT_CONF = float(os.environ.get('YOLO_CONF', '0.35'))
+_DEFAULT_IOU = float(os.environ.get('YOLO_IOU', '0.45'))
+_DEFAULT_IMGSZ = int(os.environ.get('YOLO_IMGSZ', '640'))
+_DEFAULT_MAX_DET = int(os.environ.get('YOLO_MAX_DET', '50'))
+# Filter out tiny boxes (relative area in [0,1]) to reduce false positives
+_MIN_REL_AREA = float(os.environ.get('YOLO_MIN_REL_AREA', '0.0015'))
 
 
 def _resolve_weights_path() -> str:
@@ -80,16 +89,42 @@ def _get_model():
         raise
 
 
-def _run_inference(image_bytes: bytes, imgsz: int = 512, conf: float = 0.25) -> List[Dict[str, Any]]:
+def _maybe_warmup(np_img: np.ndarray):
+    global _warmed_up
+    if _warmed_up:
+        return
+    try:
+        # Perform one dry run to JIT/warm caches to reduce tail latency
+        _ = _model.predict(source=np.zeros_like(np_img), imgsz=_DEFAULT_IMGSZ, conf=_DEFAULT_CONF, iou=_DEFAULT_IOU, device=_device, max_det=1)
+        _warmed_up = True
+        print("Model warmed up")
+    except Exception as e:
+        print(f"Warmup failed (continuing): {e}")
+
+
+def _run_inference(image_bytes: bytes, imgsz: int | None = None, conf: float | None = None) -> List[Dict[str, Any]]:
     model = _get_model()
     # Convert raw bytes to numpy RGB image for Ultralytics
     pil_img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
     np_img = np.array(pil_img)
+    _maybe_warmup(np_img)
     
-    print(f"Running inference on image shape: {np_img.shape}")
-    results = model.predict(source=np_img, imgsz=imgsz, conf=conf, device=_device)
+    imgsz_eff = int(imgsz or _DEFAULT_IMGSZ)
+    conf_eff = float(conf or _DEFAULT_CONF)
+    print(f"Running inference on image shape: {np_img.shape}, imgsz={imgsz_eff}, conf={conf_eff}, iou={_DEFAULT_IOU}")
+    results = model.predict(
+        source=np_img,
+        imgsz=imgsz_eff,
+        conf=conf_eff,
+        iou=_DEFAULT_IOU,
+        device=_device,
+        max_det=_DEFAULT_MAX_DET,
+        verbose=False,
+    )
     
     detections: List[Dict[str, Any]] = []
+    H, W = np_img.shape[:2]
+    image_area = float(H * W) if H > 0 and W > 0 else 1.0
     for r in results:
         if not hasattr(r, 'boxes') or r.boxes is None:
             continue
@@ -100,6 +135,12 @@ def _run_inference(image_bytes: bytes, imgsz: int = 512, conf: float = 0.25) -> 
             name = None
             if hasattr(r, 'names') and cls_idx is not None:
                 name = r.names.get(cls_idx)
+            # Filter very small boxes to reduce spurious detections
+            box_w = max(0.0, xyxy[2] - xyxy[0])
+            box_h = max(0.0, xyxy[3] - xyxy[1])
+            rel_area = (box_w * box_h) / image_area
+            if rel_area < _MIN_REL_AREA:
+                continue
             detections.append({
                 'box': {
                     'x1': xyxy[0], 'y1': xyxy[1], 'x2': xyxy[2], 'y2': xyxy[3],
@@ -132,6 +173,10 @@ def predict(request):
     Accepts:
       - multipart/form-data with field 'image'
       - application/json with field 'image_base64' (data URL or raw base64)
+    
+    Query parameters (optional):
+      - conf: confidence threshold (default: from env YOLO_CONF)
+      - imgsz: image size (default: from env YOLO_IMGSZ)
     """
     image_bytes = None
     try:
@@ -179,7 +224,14 @@ def predict(request):
         return JsonResponse({'error': 'invalid image data'}, status=400)
 
     try:
-        detections = _run_inference(image_bytes)
+        # Parse query parameters for runtime tuning
+        conf_param = request.GET.get('conf')
+        imgsz_param = request.GET.get('imgsz')
+        
+        conf = float(conf_param) if conf_param else None
+        imgsz = int(imgsz_param) if imgsz_param else None
+        
+        detections = _run_inference(image_bytes, imgsz=imgsz, conf=conf)
         return JsonResponse({'detections': detections})
     except Exception as e:
         print(f"Inference error: {e}")
